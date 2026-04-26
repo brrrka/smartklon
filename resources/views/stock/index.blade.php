@@ -6,6 +6,20 @@
 @section('content')
 
 {{-- ================================================================
+     SUCCESS SNACKBAR — muncul setelah scan single_in berhasil
+     ================================================================ --}}
+<div id="success-snack" class="success-snack" style="display:none;" role="status" aria-live="polite">
+    <div class="success-snack-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="success-snack-body">
+        <span class="success-snack-title">Berhasil Ditambahkan!</span>
+        <span class="success-snack-msg" id="success-snack-msg">—</span>
+    </div>
+    <button class="success-snack-close" onclick="hideSuccessSnack()">✕</button>
+</div>
+
+{{-- ================================================================
      FLOATING SCAN OVERLAY (posisi fixed top, bukan full page)
      Berlaku untuk: single_in, batch_in, out, check_stock
      ================================================================ --}}
@@ -182,11 +196,11 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                     Batch Masuk
                 </button>
-                <button class="btn-mode btn-mode--out" id="mode-out" onclick="showOutToast()">
+                <button class="btn-mode btn-mode--out" id="mode-out" onclick="startOutMode()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="12 19 19 12 12 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                     Stok Keluar
                 </button>
-                <button class="btn-mode btn-mode--check" id="mode-check" onclick="showCheckToast()">
+                <button class="btn-mode btn-mode--check" id="mode-check" onclick="startCheckMode()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                     Cek Stok
                 </button>
@@ -388,7 +402,7 @@ let wsConnected    = false;
 // ════════════════════════════════════════════════════════════
 // WEBSOCKET STATUS — gated LIVE/OFFLINE badge
 // ════════════════════════════════════════════════════════════
-window.Echo.connector.pusher.connection.bind('connected', () => {
+window.addEventListener('reverb-connected', () => {
     wsConnected = true;
     document.getElementById('log-live-badge').style.display    = '';
     document.getElementById('log-offline-badge').style.display = 'none';
@@ -397,7 +411,7 @@ window.Echo.connector.pusher.connection.bind('connected', () => {
     const pulse = document.getElementById('log-pulse');
     if (pulse) pulse.classList.add('pulse-dot--green');
 });
-window.Echo.connector.pusher.connection.bind('disconnected', () => {
+window.addEventListener('reverb-disconnected', () => {
     wsConnected = false;
     document.getElementById('log-live-badge').style.display    = 'none';
     document.getElementById('log-offline-badge').style.display = '';
@@ -531,6 +545,31 @@ function hideToast() {
     setTimeout(() => { toast.style.display = 'none'; }, 300);
 }
 
+// ════════════════════════════════════════════════════════════
+// SUCCESS SNACKBAR
+// ════════════════════════════════════════════════════════════
+let successSnackTimer = null;
+
+function showSuccessSnack(message) {
+    clearTimeout(successSnackTimer);
+    const snack = document.getElementById('success-snack');
+    const msg   = document.getElementById('success-snack-msg');
+    if (!snack || !msg) return;
+    msg.textContent = message;
+    snack.style.display = 'flex';
+    void snack.offsetWidth;
+    snack.classList.add('success-snack--visible');
+    successSnackTimer = setTimeout(hideSuccessSnack, 4000);
+}
+
+function hideSuccessSnack() {
+    clearTimeout(successSnackTimer);
+    const snack = document.getElementById('success-snack');
+    if (!snack) return;
+    snack.classList.remove('success-snack--visible');
+    setTimeout(() => { snack.style.display = 'none'; }, 350);
+}
+
 async function finishScan() {
     hideToast();
     await setMode('idle');
@@ -585,15 +624,15 @@ async function startBatchScan() {
 // ════════════════════════════════════════════════════════════
 // OUT / CHECK_STOCK mode — show toast immediately, no item specific
 // ════════════════════════════════════════════════════════════
-const origSetMode = setMode;
-document.getElementById('mode-out').addEventListener('click', async () => {
+async function startOutMode() {
     await setMode('out');
     showToast('out', null, 'Semua Produk', '');
-});
-document.getElementById('mode-check').addEventListener('click', async () => {
+}
+
+async function startCheckMode() {
     await setMode('check_stock');
     showToast('check_stock', null, 'Semua Produk', '');
-});
+}
 
 // ════════════════════════════════════════════════════════════
 // WEBSOCKET EVENT — master handler
@@ -601,46 +640,63 @@ document.getElementById('mode-check').addEventListener('click', async () => {
 window.addEventListener('rfid-scanned', function(e) {
     const data   = e.detail;
     const itemId = parseInt(data.item_id);
-    const type   = data.transaction_type;
+    const type   = data.transaction_type; // 'in' | 'out' | 'check'
 
-    // 1. Jika single_in berhasil untuk item target → tutup toast
+    // 1. Jika single_in berhasil untuk item target → tutup toast + tampilkan notif berhasil
     if (activeMode === 'single_in' && activeItemId && itemId === parseInt(activeItemId) && type === 'in') {
         hideToast();
-        setTimeout(() => applyModeUI('idle', null), 400);
+        activeMode = 'idle';
+        activeItemId = null;
+        setTimeout(() => {
+            applyModeUI('idle', null);
+            showSuccessSnack(`${data.nama_barang} berhasil ditambahkan +1 unit`);
+        }, 350);
     }
 
     // 2. Update scan log
     addScanLog(data);
 
-    // 3. Update stat cards
-    const inEl  = document.getElementById('stock-in-count');
-    const outEl = document.getElementById('stock-out-count');
-    if (type === 'in')  { if (inEl) { inEl.textContent  = parseInt(inEl.textContent) + 1; flashEl(inEl); } }
-    if (type === 'out') {
-        if (outEl) { outEl.textContent = parseInt(outEl.textContent) + 1; flashEl(outEl); }
-        if (inEl)  { inEl.textContent  = Math.max(0, parseInt(inEl.textContent) - 1); flashEl(inEl); }
+    // 3. Update stat cards global dengan nilai ABSOLUT dari payload
+    //    (bukan +1/-1 manual yang bisa desync dengan DB)
+    if (type !== 'check' && data.global_in_stock !== undefined) {
+        const inEl  = document.getElementById('stock-in-count');
+        const outEl = document.getElementById('stock-out-count');
+        if (inEl)  { inEl.textContent  = data.global_in_stock;  flashEl(inEl); }
+        if (outEl) { outEl.textContent = data.global_out_stock;  flashEl(outEl); }
     }
 
-    // 4. Transaksi hari ini
-    const todayTotalEl = document.getElementById('today-total');
-    const todayInEl    = document.getElementById('today-in');
-    const todayOutEl   = document.getElementById('today-out');
-    if (todayTotalEl) { todayTotalEl.textContent = parseInt(todayTotalEl.textContent) + 1; flashEl(todayTotalEl); }
-    if (type === 'in'  && todayInEl)  { const cur = parseInt(todayInEl.textContent.replace('+','')); todayInEl.textContent  = '+' + (cur + 1); }
-    if (type === 'out' && todayOutEl) { const cur = parseInt(todayOutEl.textContent.replace('-','')); todayOutEl.textContent = '-' + (cur + 1); }
+    // 4. Transaksi hari ini (check_stock tidak dihitung sebagai transaksi)
+    if (type === 'in' || type === 'out') {
+        const todayTotalEl = document.getElementById('today-total');
+        const todayInEl    = document.getElementById('today-in');
+        const todayOutEl   = document.getElementById('today-out');
+        if (todayTotalEl) { todayTotalEl.textContent = parseInt(todayTotalEl.textContent) + 1; flashEl(todayTotalEl); }
+        if (type === 'in'  && todayInEl)  { const cur = parseInt(todayInEl.textContent.replace('+','')); todayInEl.textContent  = '+' + (cur + 1); }
+        if (type === 'out' && todayOutEl) { const cur = parseInt(todayOutEl.textContent.replace('-','')); todayOutEl.textContent = '-' + (cur + 1); }
+    }
 
-    // 5. Update baris tabel
+    // 5. Update baris tabel dengan nilai absolut per-item
     if (data.in_stock_total !== undefined) {
         updateRowStats(itemId, parseInt(data.in_stock_total), parseInt(data.out_of_stock_total));
-        // update toast stats jika sedang aktif untuk item ini
+    }
+
+    // 6. Update toast stats:
+    //    - batch_in / single_in: update jika item cocok
+    //    - out / check_stock: tampilkan info produk yang baru di-scan
+    if (data.in_stock_total !== undefined) {
+        const total = parseInt(data.in_stock_total) + parseInt(data.out_of_stock_total);
+        const pct   = total > 0 ? Math.round((parseInt(data.in_stock_total) / total) * 100) : 0;
+
         if (activeItemId && itemId === parseInt(activeItemId)) {
-            const total = parseInt(data.in_stock_total) + parseInt(data.out_of_stock_total);
-            const pct   = total > 0 ? Math.round((data.in_stock_total / total) * 100) : 0;
+            updateToastStats(data.in_stock_total, data.out_of_stock_total, pct);
+        } else if (!activeItemId && (activeMode === 'out' || activeMode === 'check_stock')) {
+            document.getElementById('toast-product-name').textContent = data.nama_barang || '—';
+            document.getElementById('toast-product-code').textContent = data.kode_barang || '—';
             updateToastStats(data.in_stock_total, data.out_of_stock_total, pct);
         }
     }
 
-    // 6. Jika tag list terbuka, refresh
+    // 7. Jika tag list terbuka, refresh
     setTimeout(() => refreshTagList(itemId), 300);
 });
 
@@ -683,20 +739,27 @@ function addScanLog(data) {
     const emp = document.getElementById('log-empty-state');
     if (emp) emp.remove();
 
-    const isIn    = data.transaction_type === 'in';
+    const type    = data.transaction_type; // 'in' | 'out' | 'check'
+    const isIn    = type === 'in';
+    const isCheck = type === 'check';
     const time    = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const epcShort = data.epc_id ? data.epc_id.substring(0, 10) + '…' : '—';
+    const epcShort = data.epc_id ? data.epc_id.substring(0, 16) + (data.epc_id.length > 16 ? '…' : '') : '—';
+
+    const itemClass  = isIn ? 'in' : (isCheck ? 'check' : 'out');
+    const dotClass   = isIn ? 'scan-log-dot--in' : (isCheck ? 'scan-log-dot--check' : 'scan-log-dot--out');
+    const badgeClass = isIn ? 'badge--success' : (isCheck ? 'badge--info' : 'badge--danger');
+    const label      = isIn ? '+IN' : (isCheck ? '?CEK' : '−OUT');
 
     const el = document.createElement('div');
-    el.className = 'scan-log-item scan-log-item--' + (isIn ? 'in' : 'out') + ' fade-in';
+    el.className = 'scan-log-item scan-log-item--' + itemClass + ' fade-in';
     el.innerHTML = `
-        <div class="scan-log-indicator ${isIn ? 'scan-log-dot--in' : 'scan-log-dot--out'}"></div>
+        <div class="scan-log-indicator ${dotClass}"></div>
         <div class="scan-log-body">
             <span class="scan-log-name">${data.nama_barang || '—'}</span>
             <span class="scan-log-epc">${epcShort}</span>
         </div>
         <div class="scan-log-right">
-            <span class="badge ${isIn ? 'badge--success' : 'badge--danger'}" style="font-size:10px">${isIn ? '+IN' : '−OUT'}</span>
+            <span class="badge ${badgeClass}" style="font-size:10px">${label}</span>
             <span class="scan-log-time">${time}</span>
         </div>`;
     log.insertBefore(el, log.firstChild);
@@ -829,6 +892,24 @@ loadScannerState();
 </script>
 
 <style>
+/* ── Success Snackbar ── */
+.success-snack {
+    position:fixed; top:-80px; left:50%; transform:translateX(-50%);
+    background:#16a34a; color:white;
+    border-radius:10px; padding:12px 16px;
+    display:flex; align-items:center; gap:10px;
+    box-shadow:0 6px 24px rgba(22,163,74,.35);
+    z-index:10000; min-width:260px; max-width:calc(100vw - 32px);
+    transition:top .35s cubic-bezier(.34,1.56,.64,1);
+}
+.success-snack--visible { top:16px; }
+.success-snack-icon { width:28px;height:28px;background:rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+.success-snack-body { flex:1;min-width:0; }
+.success-snack-title { display:block;font-size:12px;font-weight:700;letter-spacing:.03em; }
+.success-snack-msg   { display:block;font-size:11px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.success-snack-close { background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:14px;padding:2px 4px;flex-shrink:0; }
+.success-snack-close:hover { color:white; }
+
 /* ── Floating Scan Toast ── */
 .scan-toast {
     position: fixed; top: -120px; left: 50%; transform: translateX(-50%);
@@ -900,10 +981,14 @@ loadScannerState();
 .stock-scan-log { display:flex;flex-direction:column;gap:5px;max-height:300px;overflow-y:auto;padding-right:2px; }
 .stock-scan-log::-webkit-scrollbar{width:3px;} .stock-scan-log::-webkit-scrollbar-thumb{background:var(--grey-200);border-radius:2px;}
 .scan-log-item { display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;border-left:2px solid transparent; }
-.scan-log-item--in  { background:var(--green-50);border-left-color:var(--green-400); }
-.scan-log-item--out { background:var(--red-50);border-left-color:var(--red-400); }
+.scan-log-item--in    { background:var(--green-50);border-left-color:var(--green-400); }
+.scan-log-item--out   { background:var(--red-50);border-left-color:var(--red-400); }
+.scan-log-item--check { background:#eff6ff;border-left-color:#60a5fa; }
 .scan-log-indicator { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
-.scan-log-dot--in  { background:var(--green-500); } .scan-log-dot--out { background:var(--red-500); }
+.scan-log-dot--in    { background:var(--green-500); }
+.scan-log-dot--out   { background:var(--red-500); }
+.scan-log-dot--check { background:#3b82f6; }
+.badge--info { background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe; }
 .scan-log-body { flex:1;min-width:0; }
 .scan-log-name { display:block;font-size:12px;font-weight:600;color:var(--grey-800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
 .scan-log-epc  { display:block;font-size:10px;color:var(--grey-400);font-family:monospace; }

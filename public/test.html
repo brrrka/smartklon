@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+    <script>
+        Pusher.logToConsole = true;
+        var pusher = new Pusher('smartklon-key-local', {
+            wsHost: '127.0.0.1',
+            wsPort: 8080,
+            forceTLS: false,
+            disableStats: true,
+            enabledTransports: ['ws']
+        });
+        var channel = pusher.subscribe('rfid-scanner');
+        channel.bind('rfid.scanned', function(data) {
+            console.log("RECEIVED DATA:", data);
+            fetch('/test-log.php?msg=RECEIVED_DATA');
+        });
+        channel.bind('pusher:subscription_succeeded', function() {
+            fetch('/test-log.php?msg=SUBSCRIBED');
+        });
+    </script>
+</head>
+<body>Testing Reverb</body>
+</html>
