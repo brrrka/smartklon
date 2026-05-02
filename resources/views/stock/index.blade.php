@@ -98,8 +98,12 @@
             </button>
         </div>
         <div class="batch-modal-body">
-            <label class="form-label" for="batch-product-select">Produk Target</label>
-            <select class="form-select" id="batch-product-select">
+            <div class="batch-search-wrap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <input type="text" class="batch-search-input" id="batch-search" placeholder="Cari nama atau kode produk…" oninput="filterBatchProducts()" autocomplete="off">
+            </div>
+            <label class="form-label" for="batch-product-select" style="margin-top:10px;display:block;">Produk Target</label>
+            <select class="form-select" id="batch-product-select" size="5" style="height:auto;">
                 <option value="">-- Pilih produk --</option>
                 @foreach($items as $item)
                     <option value="{{ $item->id }}" data-kode="{{ $item->kode_barang }}" data-nama="{{ $item->nama_barang }}">
@@ -113,6 +117,56 @@
             <button class="btn btn--primary" onclick="startBatchScan()" id="batch-start-btn">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>
                 Mulai Scan
+            </button>
+        </div>
+    </div>
+</div>
+
+{{-- ================================================================
+     MODAL DETAIL PRODUK
+     ================================================================ --}}
+<div id="detail-modal-overlay" class="detail-modal-overlay" style="display:none;" onclick="closeDetailModal(event)">
+    <div class="detail-modal" role="dialog" aria-modal="true">
+        <div class="detail-modal-header">
+            <div class="detail-modal-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            </div>
+            <div style="flex:1;min-width:0;">
+                <h3 class="detail-modal-title" id="detail-modal-nama">—</h3>
+                <div style="display:flex;align-items:center;gap:8px;margin-top:3px;">
+                    <span class="badge badge--code" style="font-size:11px;" id="detail-modal-kode">—</span>
+                    <span class="detail-modal-satuan-badge" id="detail-modal-satuan">—</span>
+                </div>
+            </div>
+            <button class="batch-modal-close" onclick="closeDetailModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+        </div>
+        <div class="detail-modal-stats">
+            <div class="detail-stat-box">
+                <span class="detail-stat-val detail-stat--green" id="detail-in">—</span>
+                <span class="detail-stat-label">In Stock</span>
+            </div>
+            <div class="detail-stat-divider"></div>
+            <div class="detail-stat-box">
+                <span class="detail-stat-val detail-stat--red" id="detail-out">—</span>
+                <span class="detail-stat-label">Keluar</span>
+            </div>
+            <div class="detail-stat-divider"></div>
+            <div class="detail-stat-box">
+                <span class="detail-stat-val" id="detail-pct">—</span>
+                <span class="detail-stat-label">Ketersediaan</span>
+            </div>
+        </div>
+        <div class="detail-modal-body">
+            <div class="detail-desc-label">Deskripsi</div>
+            <div class="detail-desc-val" id="detail-deskripsi">—</div>
+        </div>
+        <div class="detail-modal-footer">
+            <button class="btn btn--secondary" onclick="closeDetailModal()">Tutup</button>
+            <button class="btn btn--primary" id="detail-batch-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                Batch Masuk Produk Ini
             </button>
         </div>
     </div>
@@ -230,7 +284,7 @@
                 <div class="form-grid form-grid--2">
                     <div class="form-group">
                         <label class="form-label" for="kode_barang">Kode Barang</label>
-                        <input type="text" id="kode_barang" name="kode_barang" class="form-input {{ $errors->has('kode_barang') ? 'form-input--error' : '' }}" placeholder="BRG-006" value="{{ old('kode_barang') }}" required>
+                        <input type="text" id="kode_barang" name="kode_barang" class="form-input {{ $errors->has('kode_barang') ? 'form-input--error' : '' }}" placeholder="BRG-001" value="{{ old('kode_barang') }}" required>
                         @error('kode_barang')<span class="form-error">{{ $message }}</span>@enderror
                     </div>
                     <div class="form-group">
@@ -324,7 +378,7 @@
                     <th>Out</th>
                     <th>Total</th>
                     <th>Ketersediaan</th>
-                    <th style="width:100px;">Aksi</th>
+                    <th style="width:160px;">Aksi</th>
                 </tr>
             </thead>
             <tbody id="stock-table-body">
@@ -338,7 +392,9 @@
                     data-name="{{ strtolower($item->nama_barang) }}"
                     data-kode="{{ strtolower($item->kode_barang) }}"
                     data-in="{{ $item->in_stock_count }}"
-                    data-pct="{{ $pct }}">
+                    data-pct="{{ $pct }}"
+                    data-satuan="{{ e($item->satuan ?? 'pcs') }}"
+                    data-deskripsi="{{ e($item->deskripsi ?? '') }}">
                     <td>
                         <button class="expand-btn" onclick="toggleTagList({{ $item->id }})" id="expand-btn-{{ $item->id }}">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="expand-icon" id="expand-icon-{{ $item->id }}">
@@ -359,12 +415,24 @@
                         </div>
                     </td>
                     <td>
-                        <button class="btn-add-unit"
-                            onclick="startSingleIn({{ $item->id }}, '{{ addslashes($item->nama_barang) }}', '{{ $item->kode_barang }}')"
-                            title="Tambah 1 unit via RFID">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                            1 Unit
-                        </button>
+                        <div class="row-actions">
+                            <button class="btn-row-icon btn-row-icon--detail"
+                                onclick="showProductDetail({{ $item->id }})"
+                                title="Lihat detail produk">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
+                            </button>
+                            <button class="btn-row-icon btn-row-icon--batch"
+                                onclick="openBatchModal({{ $item->id }})"
+                                title="Batch masuk produk ini">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke="currentColor" stroke-width="2"/><line x1="12" y1="12" x2="12" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="9.5" y1="14.5" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            </button>
+                            <button class="btn-add-unit"
+                                onclick="startSingleIn({{ $item->id }}, '{{ addslashes($item->nama_barang) }}', '{{ $item->kode_barang }}')"
+                                title="Tambah 1 unit via RFID">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                1 Unit
+                            </button>
+                        </div>
                     </td>
                 </tr>
                 <tr class="tag-list-row" id="tags-{{ $item->id }}" style="display:none;">
@@ -459,10 +527,10 @@ function applyModeUI(mode, targetItemId) {
 
     const msgs = {
         idle:        '⏸ Scanner idle — semua scan diabaikan.',
-        batch_in:    '📦 Batch Masuk aktif — scan terus sampai klik Selesai.',
-        single_in:   '📥 Single Masuk — menunggu 1 scan, lalu otomatis idle.',
-        out:         '📤 Stok Keluar — scan tag untuk mencatat pengambilan.',
-        check_stock: '🔍 Cek Stok — scan tag untuk lihat info tanpa mutasi.',
+        batch_in:    'Batch Masuk aktif — scan terus sampai klik Selesai.',
+        single_in:   'Single Masuk — menunggu 1 scan, lalu otomatis idle.',
+        out:         'Stok Keluar — scan tag untuk mencatat pengambilan.',
+        check_stock: 'Cek Stok — scan tag untuk lihat info tanpa mutasi.',
     };
     document.getElementById('scanner-status-text').textContent = msgs[mode] || mode;
 
@@ -494,7 +562,7 @@ function showToast(mode, itemId, itemName, itemCode) {
     document.getElementById('toast-out-count').textContent     = outEl ? outEl.textContent : '—';
     document.getElementById('toast-pct').textContent           = pctEl ? pctEl.textContent : '—';
 
-    const modeLabels = { single_in: '📥 Single Masuk', batch_in: '📦 Batch Masuk', out: '📤 Stok Keluar', check_stock: '🔍 Cek Stok' };
+    const modeLabels = { single_in: 'Single Masuk', batch_in: 'Batch Masuk', out: 'Stok Keluar', check_stock: 'Cek Stok' };
     document.getElementById('toast-mode-label').textContent = modeLabels[mode] || mode;
 
     // Batch mode: no countdown
@@ -591,7 +659,41 @@ async function startSingleIn(itemId, itemName, itemCode) {
 // ════════════════════════════════════════════════════════════
 // BATCH MODAL
 // ════════════════════════════════════════════════════════════
-function openBatchModal() {
+let _batchAllOptions = [];
+
+function initBatchSearch() {
+    const sel = document.getElementById('batch-product-select');
+    if (!sel) return;
+    _batchAllOptions = Array.from(sel.options).map(o => ({
+        value: o.value, text: o.text,
+        kode: o.getAttribute('data-kode') || '',
+        nama: o.getAttribute('data-nama') || '',
+    }));
+}
+
+function filterBatchProducts() {
+    const q   = (document.getElementById('batch-search').value || '').toLowerCase().trim();
+    const sel = document.getElementById('batch-product-select');
+    if (!sel) return;
+    const cur = sel.value;
+    while (sel.options.length > 1) sel.remove(1);
+    _batchAllOptions.filter(o => o.value).forEach(o => {
+        if (!q || o.text.toLowerCase().includes(q)) {
+            const opt = document.createElement('option');
+            opt.value = o.value; opt.text = o.text;
+            opt.setAttribute('data-kode', o.kode);
+            opt.setAttribute('data-nama', o.nama);
+            sel.add(opt);
+        }
+    });
+    if (cur && Array.from(sel.options).find(o => o.value === cur)) sel.value = cur;
+}
+
+function openBatchModal(preItemId = null) {
+    const searchEl = document.getElementById('batch-search');
+    if (searchEl) { searchEl.value = ''; filterBatchProducts(); }
+    const sel = document.getElementById('batch-product-select');
+    if (sel) sel.value = preItemId ? String(preItemId) : '';
     document.getElementById('batch-modal-overlay').style.display = 'flex';
     setTimeout(() => document.getElementById('batch-modal-overlay').classList.add('batch-modal-overlay--visible'), 10);
 }
@@ -798,7 +900,7 @@ function renderTagList(container, tags) {
     const inStock = tags.filter(t => t.status === 'in_stock');
     const out     = tags.filter(t => t.status !== 'in_stock');
     let firstIn   = true;
-    let html      = `<div class="tag-grid"><div class="tag-grid-header"><span>📦 <strong>${inStock.length}</strong> In Stock</span><span class="text-muted">📤 <strong>${out.length}</strong> Out</span></div><div class="tag-chips">`;
+    let html      = `<div class="tag-grid"><div class="tag-grid-header"><span><strong>${inStock.length}</strong> In Stock</span><span class="text-muted"><strong>${out.length}</strong> Out</span></div><div class="tag-chips">`;
     tags.forEach(tag => {
         const isOut  = tag.status === 'out_of_stock';
         const isFifo = !isOut && firstIn;
@@ -886,9 +988,46 @@ function toggleAddForm() {
     icon.style.transform  = visible ? '' : 'rotate(180deg)';
 }
 
+// ════════════════════════════════════════════════════════════
+// DETAIL MODAL
+// ════════════════════════════════════════════════════════════
+function showProductDetail(itemId) {
+    const row = document.getElementById('row-' + itemId);
+    if (!row) return;
+
+    const kode      = row.querySelector('.badge--code')?.textContent?.trim() || '—';
+    const nama      = row.querySelector('.font-medium')?.textContent?.trim() || '—';
+    const satuan    = row.getAttribute('data-satuan') || '—';
+    const deskripsi = row.getAttribute('data-deskripsi') || '';
+    const inStock   = document.getElementById('in-count-'  + itemId)?.textContent?.trim() || '0';
+    const outStock  = document.getElementById('out-count-' + itemId)?.textContent?.trim() || '0';
+    const pct       = row.getAttribute('data-pct') || '0';
+
+    document.getElementById('detail-modal-nama').textContent    = nama;
+    document.getElementById('detail-modal-kode').textContent    = kode;
+    document.getElementById('detail-modal-satuan').textContent  = satuan;
+    document.getElementById('detail-in').textContent            = inStock;
+    document.getElementById('detail-out').textContent           = outStock;
+    document.getElementById('detail-pct').textContent           = pct + '%';
+    document.getElementById('detail-deskripsi').textContent     = deskripsi || '(tidak ada deskripsi)';
+    document.getElementById('detail-deskripsi').classList.toggle('detail-desc-empty', !deskripsi);
+
+    document.getElementById('detail-batch-btn').onclick = () => { closeDetailModal(); openBatchModal(itemId); };
+
+    document.getElementById('detail-modal-overlay').style.display = 'flex';
+    setTimeout(() => document.getElementById('detail-modal-overlay').classList.add('detail-modal-overlay--visible'), 10);
+}
+
+function closeDetailModal(e) {
+    if (e && e.target !== document.getElementById('detail-modal-overlay')) return;
+    document.getElementById('detail-modal-overlay').classList.remove('detail-modal-overlay--visible');
+    setTimeout(() => { document.getElementById('detail-modal-overlay').style.display = 'none'; }, 250);
+}
+
 @if($errors->any()) toggleAddForm(); @endif
 
 loadScannerState();
+initBatchSearch();
 </script>
 
 <style>
@@ -1002,5 +1141,50 @@ loadScannerState();
 
 /* ── nav-item--soon ── */
 .nav-item--soon { opacity:.5; pointer-events:none; }
+
+/* ── Batch modal search ── */
+.batch-search-wrap { display:flex;align-items:center;gap:8px;border:1px solid var(--grey-200);border-radius:8px;padding:0 10px;background:#fafafa; }
+.batch-search-wrap svg { flex-shrink:0;color:var(--grey-400); }
+.batch-search-input { flex:1;border:none;background:none;outline:none;font-size:13px;padding:9px 0;color:var(--grey-800); }
+.batch-search-input::placeholder { color:var(--grey-400); }
+#batch-product-select { margin-top:4px;border-radius:8px;font-size:13px;padding:4px 6px; }
+
+/* ── Row action buttons ── */
+.row-actions { display:flex;align-items:center;gap:5px; }
+.btn-row-icon { width:28px;height:28px;border-radius:7px;border:1px solid var(--grey-200);background:white;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,border-color .15s; }
+.btn-row-icon--detail { color:var(--primary-500); }
+.btn-row-icon--detail:hover { background:var(--primary-50);border-color:var(--primary-300); }
+.btn-row-icon--batch { color:var(--green-600); }
+.btn-row-icon--batch:hover { background:var(--green-50);border-color:var(--green-300); }
+
+/* ── Detail modal ── */
+.detail-modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9990;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .25s; }
+.detail-modal-overlay--visible { opacity:1; }
+.detail-modal { background:white;border-radius:16px;width:460px;max-width:calc(100vw - 32px);overflow:hidden;box-shadow:0 16px 60px rgba(0,0,0,.2);transform:scale(.96) translateY(8px);transition:transform .25s; }
+.detail-modal-overlay--visible .detail-modal { transform:scale(1) translateY(0); }
+.detail-modal-header { display:flex;align-items:flex-start;gap:12px;padding:20px 20px 16px;border-bottom:1px solid var(--grey-100); }
+.detail-modal-icon { width:38px;height:38px;background:var(--primary-50);border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--primary-600);flex-shrink:0; }
+.detail-modal-title { font-size:16px;font-weight:700;color:var(--grey-800);margin:0; }
+.detail-modal-satuan-badge { font-size:11px;color:var(--grey-500);background:var(--grey-100);border-radius:10px;padding:1px 8px; }
+.detail-modal-stats { display:flex;align-items:stretch;border-bottom:1px solid var(--grey-100); }
+.detail-stat-box { flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:16px 12px; }
+.detail-stat-val { font-size:24px;font-weight:700;line-height:1; }
+.detail-stat--green { color:var(--green-600); }
+.detail-stat--red   { color:var(--red-500); }
+.detail-stat-label  { font-size:11px;color:var(--grey-400);font-weight:500; }
+.detail-stat-divider { width:1px;background:var(--grey-100);margin:12px 0; }
+.detail-modal-body { padding:16px 20px; }
+.detail-desc-label { font-size:11px;font-weight:600;color:var(--grey-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px; }
+.detail-desc-val { font-size:13px;color:var(--grey-700);line-height:1.6;min-height:40px; }
+.detail-desc-empty { color:var(--grey-400);font-style:italic; }
+.detail-modal-footer { display:flex;gap:8px;justify-content:flex-end;padding:12px 20px 20px;border-top:1px solid var(--grey-100); }
+
+/* ── Add form input padding ── */
+#add-form-body .form-input {
+    padding: 8px 12px;
+}
+#add-form-body .form-input::placeholder {
+    color: var(--grey-400);
+}
 </style>
 @endpush
