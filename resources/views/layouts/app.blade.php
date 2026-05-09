@@ -69,7 +69,7 @@
                 <span class="nav-label">Monitoring Rak</span>
             </a>
 
-            <a href="#" class="nav-item nav-item--soon" id="nav-expiry">
+            <a href="{{ route('expiry.index') }}" class="nav-item {{ request()->routeIs('expiry.*') ? 'active' : '' }}" id="nav-expiry">
                 <span class="nav-icon">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                         <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>

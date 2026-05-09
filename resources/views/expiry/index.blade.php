@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Ketersediaan Stok Produk')
-@section('page-title', 'Ketersediaan Stok Produk')
+@section('title', 'Status Kedaluwarsa')
+@section('page-title', 'Status Kedaluwarsa')
 
 @section('content')
 
@@ -84,41 +84,72 @@
      MODAL PILIH PRODUK (untuk Batch Masuk)
      ================================================================ --}}
 <div id="batch-modal-overlay" class="batch-modal-overlay" style="display:none;" onclick="closeBatchModal(event)">
-    <div class="batch-modal" role="dialog" aria-modal="true">
-        <div class="batch-modal-header">
-            <div class="batch-modal-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    {{-- Tambahkan onclick="event.stopPropagation()" agar klik di dalam modal tidak menutup modal --}}
+    <div class="batch-modal" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+
+        {{-- Bungkus dengan form untuk submit data ke backend --}}
+        <form action="{{ route('expiry.batch.store') }}" method="POST" id="form-batch-masuk">
+            @csrf
+
+            <div class="batch-modal-header">
+                <div class="batch-modal-icon">
+                    {{-- Ikon diubah menjadi bentuk box/batch --}}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke="currentColor" stroke-width="2"/><line x1="12" y1="12" x2="12" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="9.5" y1="14.5" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </div>
+                <div>
+                    <h3 class="batch-modal-title">Tambah Batch Baru</h3>
+                    <p class="batch-modal-sub">Masukkan rincian nomor batch dan tanggal kedaluwarsa.</p>
+                </div>
+                <button type="button" class="batch-modal-close" onclick="closeBatchModal()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
             </div>
-            <div>
-                <h3 class="batch-modal-title">Batch Masuk — Pilih Produk Target</h3>
-                <p class="batch-modal-sub">Scanner akan aktif terus sampai kamu klik Selesai</p>
+
+            <div class="batch-modal-body">
+                {{-- Pilihan Produk --}}
+                <div class="form-group">
+                    <label class="form-label" for="batch-search" style="margin-bottom:8px; display:block;">Pilih Produk Target</label>
+                    <div class="batch-search-wrap">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        <input type="text" class="batch-search-input" id="batch-search" placeholder="Cari nama atau kode produk…" oninput="filterBatchProducts()" autocomplete="off">
+                    </div>
+
+                    {{-- Atribut name="item_id" ditambahkan agar terkirim ke server --}}
+                    <select class="form-select" name="item_id" id="batch-product-select" size="4" style="height:auto; margin-top:8px;" required>
+                        <option value="" disabled selected>-- Pilih produk dari daftar --</option>
+                        @foreach($items as $item)
+                            <option value="{{ $item->id }}" data-kode="{{ $item->kode_barang }}" data-nama="{{ $item->nama_barang }}">
+                                {{ $item->kode_barang }} — {{ $item->nama_barang }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- Input Batch & Kedaluwarsa (Tampil bersebelahan / Grid) --}}
+                <div class="form-grid form-grid--2" style="margin-top: 16px;">
+                    <div class="form-group">
+                        <label class="form-label" for="batch_number">Nomor Batch <span style="color:var(--red-500)">*</span></label>
+                        <input type="text" id="batch_number" name="batch_number" class="form-input" placeholder="Contoh: BT-0921" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="expiry_date">Tanggal Kedaluwarsa <span style="color:var(--red-500)">*</span></label>
+                        {{-- Menggunakan input type="date" untuk memunculkan kalender bawaan browser --}}
+                        <input type="date" id="expiry_date" name="expiry_date" class="form-input" required>
+                    </div>
+                </div>
             </div>
-            <button class="batch-modal-close" onclick="closeBatchModal()">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/></svg>
-            </button>
-        </div>
-        <div class="batch-modal-body">
-            <div class="batch-search-wrap">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                <input type="text" class="batch-search-input" id="batch-search" placeholder="Cari nama atau kode produk…" oninput="filterBatchProducts()" autocomplete="off">
+
+            <div class="batch-modal-footer">
+                <button type="button" class="btn btn--secondary" onclick="closeBatchModal()">Batal</button>
+                {{-- Tombol submit form --}}
+                <button type="submit" class="btn btn--primary" id="batch-save-btn">
+                    {{-- Ikon diubah menjadi ikon Save/Disket --}}
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="17 21 17 13 7 13 7 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="7 3 7 8 15 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Simpan Batch
+                </button>
             </div>
-            <label class="form-label" for="batch-product-select" style="margin-top:10px;display:block;">Produk Target</label>
-            <select class="form-select" id="batch-product-select" size="5" style="height:auto;">
-                <option value="">-- Pilih produk --</option>
-                @foreach($items as $item)
-                    <option value="{{ $item->id }}" data-kode="{{ $item->kode_barang }}" data-nama="{{ $item->nama_barang }}">
-                        {{ $item->kode_barang }} — {{ $item->nama_barang }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
-        <div class="batch-modal-footer">
-            <button class="btn btn--secondary" onclick="closeBatchModal()">Batal</button>
-            <button class="btn btn--primary" onclick="startBatchScan()" id="batch-start-btn">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>
-                Mulai Scan
-            </button>
-        </div>
+
+        </form>
     </div>
 </div>
 
@@ -176,6 +207,8 @@
      STAT CARDS — 4 kolom (+ Transaksi Hari Ini)
      ================================================================ --}}
 <div class="stats-grid" id="stats-grid">
+
+    <!-- CARD 1: Total SKU -->
     <div class="stat-card">
         <div class="stat-card-icon stat-card-icon--blue">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="currentColor" stroke-width="2"/><line x1="7" y1="7" x2="7.01" y2="7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
@@ -184,31 +217,40 @@
             <span class="stat-card-value">{{ $totalSku }}</span>
             <span class="stat-card-label">Total SKU Produk</span>
         </div>
-        <div class="stat-card-trend stat-card-trend--neutral">Katalog aktif</div>
+        <div class="stat-card-trend stat-card-trend--neutral">Katalog Aktif</div>
     </div>
 
+    <!-- CARD 2: Unit Tersedia (Active Batches) + Breakdown Safe & Warning -->
     <div class="stat-card">
         <div class="stat-card-icon stat-card-icon--green">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="17 6 23 6 23 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </div>
         <div class="stat-card-body">
-            <span class="stat-card-value" id="stock-in-count">{{ $totalInStock }}</span>
-            <span class="stat-card-label">Unit Tersedia</span>
+            <span class="stat-card-value" id="active-batch-count">{{ $totalActiveBatches }}</span>
+            <span class="stat-card-label">Batch Tersedia</span>
         </div>
-        <div class="stat-card-trend stat-card-trend--up">In Stock</div>
+        <div class="stat-card-trend">
+            <span style="color:var(--green-500); font-weight: 500;">Aman: {{ $totalSafe }}</span> &nbsp;|&nbsp;
+            <span style="color:var(--amber-500); font-weight: 500;">H-7: {{ $totalWarning }}</span>
+        </div>
     </div>
 
+    <!-- CARD 3: Unit Kedaluwarsa (Perlu Ditarik) -->
     <div class="stat-card">
         <div class="stat-card-icon stat-card-icon--red">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="17 18 23 18 23 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <!-- Icon diubah menjadi Alert Triangle agar lebih relevan dengan status expired -->
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         </div>
         <div class="stat-card-body">
-            <span class="stat-card-value" id="stock-out-count">{{ $totalOutOfStock }}</span>
-            <span class="stat-card-label">Unit Keluar</span>
+            <span class="stat-card-value" id="expired-batch-count">{{ $totalExpired }}</span>
+            <span class="stat-card-label">Kedaluwarsa (Aktif)</span>
         </div>
-        <div class="stat-card-trend stat-card-trend--down">Out of Stock</div>
+        <div class="stat-card-trend stat-card-trend--down">
+            Batch Non-aktif: {{ $totalInactiveBatches }}
+        </div>
     </div>
 
+    <!-- CARD 4: Transaksi Hari Ini -->
     <div class="stat-card">
         <div class="stat-card-icon stat-card-icon--amber">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><polyline points="12 6 12 12 16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -218,9 +260,10 @@
             <span class="stat-card-label">Transaksi Hari Ini</span>
         </div>
         <div class="stat-card-trend">
-            <span style="color:var(--green-500)" id="today-in">+{{ $stockInToday }}</span>&nbsp;/&nbsp;<span style="color:var(--red-500)" id="today-out">-{{ $stockOutToday }}</span>
+            <span style="color:var(--green-500)" id="today-in">+{{ $stockInToday }} (In)</span>&nbsp;/&nbsp;<span style="color:var(--red-500)" id="today-out">-{{ $stockOutToday }} (Out)</span>
         </div>
     </div>
+
 </div>
 
 {{-- ================================================================
@@ -342,32 +385,28 @@
 </div>{{-- /stock-control-row --}}
 
 {{-- ================================================================
-     TABEL STOK PRODUK
+     TABEL BATCH PRODUK
      ================================================================ --}}
 <div class="card">
     <div class="card-header">
         <div class="card-header-left">
-            <h2 class="card-title">Daftar Stok Produk</h2>
+            <h2 class="card-title">Daftar Batch Produk</h2>
         </div>
         <div class="stock-table-filters">
-            {{-- Search --}}
+            {{-- Search & Filters --}}
             <div class="search-wrapper">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <input type="text" class="search-input" id="stock-search" placeholder="Cari produk…" oninput="applyFilters()">
             </div>
-            {{-- Filter dropdown --}}
             <select class="filter-select" id="stock-filter" onchange="applyFilters()">
                 <option value="all">Semua</option>
-                <option value="in_stock">In Stock > 0</option>
+                <option value="in_stock">Tersedia > 0</option>
                 <option value="empty">Stok Kosong</option>
             </select>
-            {{-- Sort dropdown --}}
             <select class="filter-select" id="stock-sort" onchange="applyFilters()">
                 <option value="name_asc">Nama A–Z</option>
-                <option value="in_desc">In Stock ↓</option>
-                <option value="in_asc">In Stock ↑</option>
-                <option value="pct_desc">Ketersediaan ↓</option>
-                <option value="pct_asc">Ketersediaan ↑</option>
+                <option value="in_desc">Tersedia ↓</option>
+                <option value="in_asc">Tersedia ↑</option>
             </select>
         </div>
     </div>
@@ -379,30 +418,28 @@
                     <th>Kode</th>
                     <th>Nama Produk</th>
                     <th>Satuan</th>
-                    <th>In Stock</th>
-                    <th>Out</th>
-                    <th>Total</th>
+                    <th>Tersedia</th>
+                    <th>Habis/Ditarik</th>
+                    <th>Total Batch</th>
                     <th>Ketersediaan</th>
-                    <th style="width:160px;">Aksi</th>
+                    <th style="width:120px;">Aksi</th>
                 </tr>
             </thead>
             <tbody id="stock-table-body">
                 @forelse($items as $item)
                 @php
-                    $pct = $item->total_tags_count > 0 ? round(($item->in_stock_count / $item->total_tags_count) * 100) : 0;
+                    // Penyesuaian alias withCount dari Controller
+                    $activeCount = $item->active_batches_count ?? 0;
+                    $inactiveCount = $item->inactive_batches_count ?? 0;
+                    $totalCount = $item->total_batches_count ?? 0;
+
+                    $pct = $totalCount > 0 ? round(($activeCount / $totalCount) * 100) : 0;
                     $barClass = $pct > 60 ? 'bar--green' : ($pct > 30 ? 'bar--amber' : 'bar--red');
                 @endphp
-                <tr class="stock-row" id="row-{{ $item->id }}"
-                    data-item-id="{{ $item->id }}"
-                    data-name="{{ strtolower($item->nama_barang) }}"
-                    data-kode="{{ strtolower($item->kode_barang) }}"
-                    data-barcode="{{ strtolower($item->barcode) }}"
-                    data-in="{{ $item->in_stock_count }}"
-                    data-pct="{{ $pct }}"
-                    data-satuan="{{ e($item->satuan ?? 'pcs') }}"
-                    data-deskripsi="{{ e($item->deskripsi ?? '') }}">
+                <tr class="stock-row" id="row-{{ $item->id }}">
                     <td>
-                        <button class="expand-btn" onclick="toggleTagList({{ $item->id }})" id="expand-btn-{{ $item->id }}">
+                        {{-- Tombol Expand memanggil toggleBatchList --}}
+                        <button class="expand-btn" onclick="toggleBatchList({{ $item->id }})" id="expand-btn-{{ $item->id }}">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" class="expand-icon" id="expand-icon-{{ $item->id }}">
                                 <polyline points="6 9 12 15 18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
@@ -411,45 +448,36 @@
                     <td><span class="badge badge--code">{{ $item->kode_barang }}</span></td>
                     <td class="font-medium">{{ $item->nama_barang }}</td>
                     <td class="text-muted text-sm">{{ $item->satuan }}</td>
-                    <td><span class="count-pill count-pill--green" id="in-count-{{ $item->id }}">{{ $item->in_stock_count }}</span></td>
-                    <td><span class="count-pill count-pill--red" id="out-count-{{ $item->id }}">{{ $item->out_stock_count }}</span></td>
-                    <td class="text-muted text-sm" id="total-count-{{ $item->id }}">{{ $item->total_tags_count }}</td>
+                    <td><span class="count-pill count-pill--green">{{ $activeCount }}</span></td>
+                    <td><span class="count-pill count-pill--red">{{ $inactiveCount }}</span></td>
+                    <td class="text-muted text-sm">{{ $totalCount }}</td>
                     <td>
                         <div class="mini-bar-wrap">
-                            <div class="mini-bar"><div class="mini-bar-fill {{ $barClass }}" id="bar-fill-{{ $item->id }}" style="width:{{ $pct }}%"></div></div>
-                            <span class="mini-bar-pct" id="bar-pct-{{ $item->id }}">{{ $pct }}%</span>
+                            <div class="mini-bar"><div class="mini-bar-fill {{ $barClass }}" style="width:{{ $pct }}%"></div></div>
+                            <span class="mini-bar-pct">{{ $pct }}%</span>
                         </div>
                     </td>
                     <td>
                         <div class="row-actions">
-                            <button class="btn-row-icon btn-row-icon--detail"
-                                onclick="showProductDetail({{ $item->id }})"
-                                title="Lihat detail produk">
+                            <button class="btn-row-icon btn-row-icon--detail" onclick="showProductDetail({{ $item->id }})" title="Lihat detail produk">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
                             </button>
-                            <button class="btn-row-icon btn-row-icon--batch"
-                                onclick="openBatchModal({{ $item->id }})"
-                                title="Batch masuk produk ini">
+                            <button class="btn-row-icon btn-row-icon--batch" onclick="openBatchModal({{ $item->id }})" title="Batch masuk produk ini">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" stroke="currentColor" stroke-width="2"/><line x1="12" y1="12" x2="12" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="9.5" y1="14.5" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                            </button>
-                            <button class="btn-add-unit"
-                                onclick="startSingleIn({{ $item->id }}, '{{ addslashes($item->nama_barang) }}', '{{ $item->kode_barang }}')"
-                                title="Tambah 1 unit via RFID">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                                1 Unit
                             </button>
                         </div>
                     </td>
                 </tr>
-                <tr class="tag-list-row" id="tags-{{ $item->id }}" style="display:none;">
-                    <td colspan="9" class="tag-list-cell">
-                        <div class="tag-list-inner" id="tag-list-inner-{{ $item->id }}">
-                            <div class="tag-list-loading"><div class="spinner"></div><span>Memuat…</span></div>
+                {{-- Baris tersembunyi untuk merender list batch (Colspan 10) --}}
+                <tr class="batch-list-row" id="batches-{{ $item->id }}" style="display:none;">
+                    <td colspan="10" class="batch-list-cell">
+                        <div class="batch-list-inner" id="batch-list-inner-{{ $item->id }}">
+                            <div class="batch-list-loading"><div class="spinner"></div><span>Memuat data batch…</span></div>
                         </div>
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="9" class="text-center text-muted" style="padding:32px;">Belum ada produk. Tambahkan via panel di atas.</td></tr>
+                <tr><td colspan="10" class="text-center text-muted" style="padding:32px;">Belum ada produk.</td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -1036,6 +1064,97 @@ loadScannerState();
 initBatchSearch();
 </script>
 
+<script>
+async function toggleBatchList(itemId) {
+    const row = document.getElementById(`batches-${itemId}`);
+    const icon = document.getElementById(`expand-icon-${itemId}`);
+    const innerDiv = document.getElementById(`batch-list-inner-${itemId}`);
+
+    // Jika sedang terbuka, maka tutup
+    if (row.style.display === 'table-row') {
+        row.style.display = 'none';
+        icon.style.transform = 'rotate(0deg)';
+        return;
+    }
+
+    // Jika tertutup, buka dan putar ikon
+    row.style.display = 'table-row';
+    icon.style.transform = 'rotate(180deg)';
+
+    // Cek apakah data sudah pernah dimuat (mencegah load ulang berkali-kali)
+    if (innerDiv.dataset.loaded === 'true') return;
+
+    // Tampilkan loading spinner
+    innerDiv.innerHTML = '<div class="batch-list-loading"><div class="spinner"></div><span>Memuat data batch…</span></div>';
+
+    try {
+        // Panggil endpoint backend (sesuaikan URL jika prefix-nya berbeda)
+        const response = await fetch(`/expiry/item/${itemId}/batches`);
+        if (!response.ok) throw new Error('Gagal mengambil data');
+        const data = await response.json();
+
+        const expiries = data.expiries;
+
+        if (expiries.length === 0) {
+            innerDiv.innerHTML = '<div class="batch-empty-state">Belum ada data batch untuk produk ini.</div>';
+            innerDiv.dataset.loaded = 'true';
+            return;
+        }
+
+        // Render tabel mini untuk list batch
+        let html = `
+            <table class="batch-mini-table">
+                <thead class="batch-mini-thead">
+                    <tr>
+                        <th class="batch-mini-th">Nomor Batch</th>
+                        <th class="batch-mini-th">Tgl Kedaluwarsa</th>
+                        <th class="batch-mini-th">Sisa Hari</th>
+                        <th class="batch-mini-th">Status Kedaluwarsa</th>
+                        <th class="batch-mini-th">Ketersediaan</th>
+                    </tr>
+                </thead>
+                <tbody class="batch-mini-tbody">
+        `;
+
+        expiries.forEach(exp => {
+            // Mewarnai badge berdasarkan expiry_state (dari Accessor Model)
+            let stateBadge = '';
+            if (exp.expiry_state === 'Safe') {
+                stateBadge = '<span class="badge-mini badge-mini--safe">Safe</span>';
+            } else if (exp.expiry_state === 'Warning') {
+                stateBadge = '<span class="badge-mini badge-mini--warning">Warning</span>';
+            } else {
+                stateBadge = '<span class="badge-mini badge-mini--expired">Expired</span>';
+            }
+
+            // Ketersediaan Fisik (status dari database: 0 = Tersedia, 1 = Ditarik)
+            let physicalStatus = exp.status == 0
+                ? '<span class="text-available">Available</span>'
+                : '<span class="text-out">Withdrawn/Out of Stock</span>';
+
+            html += `
+                <tr class="batch-mini-tr">
+                    <td class="batch-mini-td batch-mini-td-bold">${exp.batch_number}</td>
+                    <td class="batch-mini-td">${exp.expiry_date}</td>
+                    <td class="batch-mini-td">${exp.days_left} hari</td>
+                    <td class="batch-mini-td">${stateBadge}</td>
+                    <td class="batch-mini-td">${physicalStatus}</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table>`;
+
+        // Masukkan HTML ke dalam div dan tandai sebagai 'loaded'
+        innerDiv.innerHTML = html;
+        innerDiv.dataset.loaded = 'true';
+
+    } catch (error) {
+        innerDiv.innerHTML = '<div class="batch-error-state">Gagal memuat data. Silakan coba lagi.</div>';
+    }
+}
+</script>
+
 <style>
 /* ── Success Snackbar ── */
 .success-snack {
@@ -1184,6 +1303,72 @@ initBatchSearch();
 .detail-desc-val { font-size:13px;color:var(--grey-700);line-height:1.6;min-height:40px; }
 .detail-desc-empty { color:var(--grey-400);font-style:italic; }
 .detail-modal-footer { display:flex;gap:8px;justify-content:flex-end;padding:12px 20px 20px;border-top:1px solid var(--grey-100); }
+
+.batch-empty-state { padding: 15px; color: #6b7280; text-align: center;}
+    .batch-error-state {
+        padding: 15px;
+        color: #dc2626;
+        text-align: center;
+    }
+
+    /* Mini Table Styles */
+    .batch-mini-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #f9fafb;
+        border-radius: 6px;
+        overflow: hidden;
+        margin: 10px 0;
+    }
+    .batch-mini-thead {
+        background: #f3f4f6;
+        text-align: left;
+        font-size: 12px;
+        color: #6b7280;
+    }
+    .batch-mini-tbody {
+        font-size: 13px;
+    }
+    .batch-mini-tr {
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .batch-mini-th,
+    .batch-mini-td {
+        padding: 8px 12px;
+    }
+    .batch-mini-td-bold {
+        font-weight: 500;
+    }
+
+    /* Badges */
+    .badge-mini {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        display: inline-block;
+    }
+    .badge-mini--safe {
+        background: #dcfce7;
+        color: #166534;
+    }
+    .badge-mini--warning {
+        background: #fef08a;
+        color: #854d0e;
+    }
+    .badge-mini--expired {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    /* Text Colors */
+    .text-available {
+        color: #059669;
+        font-weight: 500;
+    }
+    .text-out {
+        color: #dc2626;
+    }
 
 /* ── Add form input padding ── */
 #add-form-body .form-input {

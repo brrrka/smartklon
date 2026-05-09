@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ScannerStateController;
 use App\Http\Controllers\StockController;
+use App\Http\Controllers\ExpiryController;
 use Illuminate\Support\Facades\Route;
 
 // -------------------------------------------------------
@@ -30,4 +31,11 @@ Route::middleware('auth')->group(function () {
     // Scanner State
     Route::post('/scanner/mode', [ScannerStateController::class, 'update'])->name('scanner.mode.update');
     Route::get('/scanner/mode', [ScannerStateController::class, 'current'])->name('scanner.mode.current');
+
+
+    // Expiry Management
+    Route::get('/expiry', [ExpiryController::class, 'index'])->name('expiry.index');
+    Route::post('/expiry/batch', [ExpiryController::class, 'storeBatch'])->name('expiry.batch.store');
+    // Tambahkan di dalam file routes/web.php
+    Route::get('/expiry/item/{item}/batches', [ExpiryController::class, 'getExpiriesByItem'])->name('expiry.item.batches');
 });

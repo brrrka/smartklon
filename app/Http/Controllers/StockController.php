@@ -33,13 +33,13 @@ class StockController extends Controller
             'stockInToday',
             'stockOutToday'
         ));
-
     }
 
     public function storeItem(Request $request)
     {
         $request->validate([
             'kode_barang' => 'required|string|max:50|unique:items,kode_barang',
+            'barcode'     => 'nullable|string|max:50|unique:items,barcode',
             'nama_barang' => 'required|string|max:255',
             'deskripsi'   => 'nullable|string',
             'satuan'      => 'nullable|string|max:50',
@@ -47,9 +47,10 @@ class StockController extends Controller
 
         Item::create([
             'kode_barang' => strtoupper($request->kode_barang),
+            'barcode'     => $request->barcode ? strtoupper($request->barcode) : null,
             'nama_barang' => $request->nama_barang,
             'deskripsi'   => $request->deskripsi,
-            'satuan'      => $request->satuan ?? 'pcs',
+            'satuan'      => $request->satuan ?? 'PCS',
         ]);
 
         return redirect()->route('stock.index')->with('success', 'Produk berhasil ditambahkan.');
@@ -105,4 +106,3 @@ class StockController extends Controller
         ]);
     }
 }
-
